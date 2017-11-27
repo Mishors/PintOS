@@ -135,9 +135,20 @@ thread_tick (void)
     kernel_ticks++;
 
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
-    intr_yield_on_return ();
+  if (++thread_ticks >= TIME_SLICE){
+     /* Calls thread_yield() implicitly */
+     intr_yield_on_return ();    
+  }
 }
+
+/*Comparator to push threads in ready list to preserve ascending order */
+bool less_prio_for_prio(const struct list_elem *a,const struct list_elem *b,void *aux){
+struct thread *t1 = list_entry (a, struct thread, elem);
+struct thread *t2 = list_entry (b, struct thread, elem);
+ if(t1->priority < t2->priority)
+  return true;
+ return false;
+}//end of less_comp function
 
 /* Prints thread statistics. */
 void
@@ -208,7 +219,12 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
+  /* added to preempt the cpu to allow the created
+     thread of higher priority to do its job */
+	
+  struct thread *cur = thread_current();
+  if (t->priority > cur->priority)
+     thread_yield();
   return tid;
 }
 
@@ -222,12 +238,9 @@ void
 thread_block (void) 
 {
   ASSERT (!intr_context ());
-  ASSERT (intr_get_level () == INTR_OFF);
- // printf("Afters   ");
-  thread_current ()->status = THREAD_BLOCKED;
-  
-  schedule ();
- // printf("AfterMath");
+  ASSERT (intr_get_level () == INTR_OFF); 
+  thread_current ()->status = THREAD_BLOCKED;  
+  schedule (); 
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -247,7 +260,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list,&t->elem,less_prio_for_prio,0);           
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -318,7 +331,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list,&cur->elem,less_prio_for_prio,0);         
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -346,6 +359,7 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -464,14 +478,14 @@ init_thread (struct thread *t, const char *name, int priority)
   ASSERT (t != NULL);
   ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
   ASSERT (name != NULL);
-
   memset (t, 0, sizeof *t);
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  list_push_back (&all_list, &t->allelem);
+  list_insert_ordered (&all_list,&t->allelem,less_prio_for_prio,0);         
+  //list_push_back (&all_list, &t->allelem);
   
 }
 
@@ -499,7 +513,7 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+    return list_entry (list_pop_back (&ready_list), struct thread, elem);
 }
 
 /* Completes a thread switch by activating the new thread's page
