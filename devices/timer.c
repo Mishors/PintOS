@@ -20,6 +20,9 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
+static struct list sleep_list;
+static struct list sleep_priority_list;
+
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -36,6 +39,8 @@ void
 timer_init (void) 
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
+    list_init (&sleep_list);
+    list_init (&sleep_priority_list);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -83,18 +88,39 @@ timer_elapsed (int64_t then)
 {
   return timer_ticks () - then;
 }
+/*Comparator to push threads in sleep list to preserve ascending order */
+bool less_comp(const struct list_elem *a,const struct list_elem *b,void *aux){
+struct thread *t1 = list_entry (a, struct thread, elem);
+struct thread *t2 = list_entry (b, struct thread, elem);
+ if(t1->wake_ticks < t2->wake_ticks)
+  return true;
+ return false;
+}//end of less_comp function
+
+
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
+  if(ticks < 1) return;
   int64_t start = timer_ticks ();
-
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  enum intr_level old_level;
+  /* Disable interrupt */
+  old_level = intr_disable ();    
+  struct thread *cur = thread_current();
+  /*Set the wake_ticks of the current thread to (ticks + start)*/
+  thread_current ()->wake_ticks = ticks + start;
+  /*Push the sleeped thread to list_sleep in ascending order*/
+  list_insert_ordered (&sleep_list,&cur->elem,less_comp,0);    
+  thread_block(); 
+  /* Enable interrupt */
+  intr_set_level (old_level);
 }
+
+
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
    turned on. */
@@ -166,11 +192,50 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
+/*Comparator to push threads in priority list to preserve ascending order */
+bool less_prio(const struct list_elem *a,const struct list_elem *b,void *aux){
+struct thread *t1 = list_entry (a, struct thread, elem);
+struct thread *t2 = list_entry (b, struct thread, elem);
+ if(t1->priority < t2->priority)
+  return true;
+ return false;
+}//end of less_comp function
+
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+
+  enum intr_level old_level;
+  /*Disable interrupt*/
+  old_level = intr_disable ();
+  struct list_elem *e;
+  int i=0;
+  
+while(list_size(&sleep_list))
+{   
+    /*Front element in sleep_list which must wake up first (smallest ticks)*/ 
+    e = list_front (&sleep_list);
+    if(list_entry(e,struct thread ,elem)->wake_ticks <= timer_ticks()){
+         struct thread *front = list_entry(e,struct thread ,elem);
+         list_pop_front(&sleep_list);
+         /*Insert the element that must wake up now to priority list to be listed
+           according to priority with threads that wake up with it*/
+         list_insert_ordered (&sleep_priority_list,&front->elem,less_prio,0);         
+       }else break;
+ }
+while(list_size(&sleep_priority_list)) 
+{        
+	e = list_pop_back(&sleep_priority_list);
+	/*Unblock the thread of highest priority*/
+        thread_unblock(list_entry(e,struct thread ,elem));  
+}
+   /*Enable interrupt*/
+   intr_set_level (old_level);
+  
+  /*Update threads ticks*/
   thread_tick ();
 }
 

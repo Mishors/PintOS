@@ -1,0 +1,1 @@
+my $name = find_file ("/media/mishors/New Volume/Misho/Engineering/Computer Department 3rd Year/OS/Pintos/Phase 0/pintos/src/threads/build/kernel.bin");

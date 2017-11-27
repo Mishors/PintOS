@@ -11,7 +11,6 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "lib/kernel/list.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -224,9 +223,11 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
-
+ // printf("Afters   ");
   thread_current ()->status = THREAD_BLOCKED;
+  
   schedule ();
+ // printf("AfterMath");
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -246,15 +247,10 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_less_func *less_p = &less_comp;
-  int *temp = 0;
-  list_insert_ordered (&ready_list,&t->elem,less_p,(void *)temp);
-  //list_push_back (&ready_list, &t->elem);
+  list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
-
-
 
 /* Returns the name of the running thread. */
 const char *
@@ -476,6 +472,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+  
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -502,8 +499,7 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
-   // return list_entry (list_pop_front (&ready_list), struct thread, elem);
-   return list_entry (list_pop_back (&ready_list), struct thread, elem);
+    return list_entry (list_pop_front (&ready_list), struct thread, elem);
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -573,6 +569,7 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
+
 }
 
 /* Returns a tid to use for a new thread. */
@@ -592,12 +589,3 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
-
-bool less_comp(const struct list_elem *a,const struct list_elem *b,void *aux){
- //if not working cast to thread structs
-struct thread *t1 = list_entry (a, struct thread, elem);
-struct thread *t2 = list_entry (b, struct thread, elem);
- if(&t1->priority < &t2->priority)
-  return true;
- return false;
-}//end of less_comp function

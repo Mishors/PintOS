@@ -16,7 +16,19 @@
 
 /* Keyboard control register port. */
 #define CONTROL_REG 0x64
-
+#define KBRD_INTRFC 0x64
+ 
+/* keyboard interface bits */
+#define KBRD_BIT_KDATA 0 /* keyboard data is in buffer (output buffer is empty) (bit 0) */
+#define KBRD_BIT_UDATA 1 /* user data is in buffer (command buffer is empty) (bit 1) */
+ 
+#define KBRD_IO 0x60 /* keyboard IO port */
+#define KBRD_RESET 0xFE /* reset CPU command */
+ 
+#define bit(n) (1<<(n)) /* Set bit n to 1 */
+ 
+/* Check if bit n in flags is set */
+#define check_flag(flags, n) ((flags) & bit(n))
 /* How to shut down when shutdown() is called. */
 static enum shutdown_type how = SHUTDOWN_NONE;
 
@@ -58,6 +70,19 @@ shutdown_reboot (void)
 {
   printf ("Rebooting...\n");
 
+uint8_t temp;
+ 
+    asm volatile ("cli"); /* disable all interrupts */
+ 
+    /* Clear all keyboard buffers (output and command buffers) */
+    do
+    {
+        temp = inb(KBRD_INTRFC); /* empty user data */
+        if (check_flag(temp, KBRD_BIT_KDATA) != 0)
+            inb(KBRD_IO); /* empty keyboard data */
+    } while (check_flag(temp, KBRD_BIT_UDATA) != 0);
+ 
+    outb(KBRD_INTRFC, KBRD_RESET); /* pulse CPU reset line */	
     /* See [kbd] for details on how to program the keyboard
      * controller. */
   for (;;)
@@ -98,15 +123,13 @@ shutdown_power_off (void)
 
   printf ("Powering off...\n");
   serial_flush ();
-
   /* NOTE: ACPI soft shutdown */
   outw (0xB004, 0x2000);
-
   /* This is a special power-off sequence supported by Bochs and
      QEMU, but not by physical hardware. */
   for (p = s; *p != '\0'; p++)
     outb (0x8900, *p);
-
+  shutdown_reboot();
   /* This will power off a VMware VM if "gui.exitOnCLIHLT = TRUE"
      is set in its configuration file.  (The "pintos" script does
      that automatically.)  */

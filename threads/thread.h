@@ -5,7 +5,6 @@
 #include <list.h>
 #include <stdint.h>
 
-
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -19,7 +18,6 @@ enum thread_status
    You can redefine this to whatever type you like. */
 typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
-
 /* Thread priorities. */
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
@@ -101,6 +99,7 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    int64_t wake_ticks;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -138,7 +137,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
-bool less_comp(const struct list_elem *a,const struct list_elem *b,void *aux);
 
 #endif /* threads/thread.h */

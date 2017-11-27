@@ -1,0 +1,8 @@
+bool less_comp(const struct list_elem *a,const struct list_elem *b,void *aux){
+ //if not working cast to thread structs
+struct thread *t1 = list_entry (a, struct thread, elem);
+struct thread *t2 = list_entry (b, struct thread, elem);
+ if(t1->wake_ticks < t2->wake_ticks)
+  return true;
+ return false;
+}//end of less_comp function
