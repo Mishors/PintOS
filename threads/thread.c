@@ -337,6 +337,23 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 
+
+void
+thread_release (void) 
+{
+  struct thread *cur = thread_current ();
+  enum intr_level old_level;
+  
+  ASSERT (!intr_context ());
+
+  old_level = intr_disable ();
+  if (cur != idle_thread) 
+    list_insert_ordered (&ready_list,&cur->elem,less_prio_for_prio,0);         
+  cur->status = THREAD_READY;
+  
+  intr_set_level (old_level);
+}
+
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -599,6 +616,13 @@ allocate_tid (void)
 
   return tid;
 }
+
+void update_ready_list(struct thread *t)
+{
+  list_remove(&t->elem);
+  list_insert_ordered (&ready_list,&t->elem,less_prio_for_prio,0);  
+}
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

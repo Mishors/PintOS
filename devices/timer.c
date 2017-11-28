@@ -235,7 +235,7 @@ while(list_size(&sleep_priority_list))
    /*Enable interrupt*/
    intr_set_level (old_level);
   
-  /*Update threads ticks*/
+  /*Update the threads ticks*/
   thread_tick ();
 }
 
