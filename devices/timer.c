@@ -230,7 +230,7 @@ while(list_size(&sleep_priority_list))
 {        
 	e = list_pop_back(&sleep_priority_list);
 	/*Unblock the thread of highest priority*/
-        thread_unblock(list_entry(e,struct thread ,elem));  
+        thread_unblock(list_entry(e,struct thread ,elem));        
 }
    /*Enable interrupt*/
    intr_set_level (old_level);

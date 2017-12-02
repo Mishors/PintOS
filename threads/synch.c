@@ -68,12 +68,23 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
-      thread_block ();
+      //list_push_back (&sema->waiters, &thread_current ()->elem);
+        list_insert_ordered (&sema->waiters,&thread_current ()->elem,less_prio_prio,0);
+        thread_block ();
     }
+ 
   sema->value--;
   intr_set_level (old_level);
 }
+
+/*Comparator to push threads in ready list to preserve ascending order */
+bool less_prio_prio(const struct list_elem *a,const struct list_elem *b,void *aux){
+struct thread *t1 = list_entry (a, struct thread, elem);
+struct thread *t2 = list_entry (b, struct thread, elem);
+ if(t1->priority <= t2->priority)
+  return true;
+ return false;
+}//end of less_comp function
 
 /* Down or "P" operation on a semaphore, but only if the
    semaphore is not already 0.  Returns true if the semaphore is
@@ -113,10 +124,13 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
-  sema->value++;
+    sema->value++;
+  if (!list_empty (&sema->waiters))
+ {   //struct thread *t = list_entry (list_pop_back (&sema->waiters),struct thread, elem);
+     thread_unblock (list_entry (list_pop_back (&sema->waiters),struct thread, elem));
+     
+  }
+
   intr_set_level (old_level);
 }
 
@@ -197,14 +211,14 @@ lock_acquire (struct lock *lock)
 
   //enum intr_level old_level;
   // old_level = intr_disable ();
-  if(lock->holder != NULL && lock->holder->priority < thread_current()->priority)
+ /* if(lock->holder != NULL && lock->holder->priority < thread_current()->priority)
   {
     lock->holder->old_priority = lock->holder->priority;
     lock->holder->priority = thread_current()->priority;
     update_ready_list(lock->holder);
     lock->holder->is_donate = 1;
     // we may need to add + 1
-  }
+  }*/
 
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
@@ -242,14 +256,14 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
   lock->holder = NULL;
- if(thread_current()->is_donate)
+/* if(thread_current()->is_donate)
   {
     //printf("hello from donate %d",thread_current()->priority);
     thread_current()->is_donate = 0;    
     thread_current()->priority = thread_current()->old_priority; 
     /*thread_yield() without schedule*/
-    thread_yield();   
- }
+   // thread_yield();   
+// }
   sema_up (&lock->semaphore);
 }
 
@@ -354,3 +368,4 @@ cond_broadcast (struct condition *cond, struct lock *lock)
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
 }
+

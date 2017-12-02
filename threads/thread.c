@@ -145,7 +145,7 @@ thread_tick (void)
 bool less_prio_for_prio(const struct list_elem *a,const struct list_elem *b,void *aux){
 struct thread *t1 = list_entry (a, struct thread, elem);
 struct thread *t2 = list_entry (b, struct thread, elem);
- if(t1->priority < t2->priority)
+ if(t1->priority <= t2->priority)
   return true;
  return false;
 }//end of less_comp function
@@ -225,7 +225,9 @@ thread_create (const char *name, int priority,
   struct thread *cur = thread_current();
   if (t->priority > cur->priority)
      thread_yield();
-  return tid;
+  
+
+ return tid;
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -240,7 +242,7 @@ thread_block (void)
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF); 
   thread_current ()->status = THREAD_BLOCKED;  
-  schedule (); 
+   schedule ();
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -251,6 +253,7 @@ thread_block (void)
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
    update other data. */
+
 void
 thread_unblock (struct thread *t) 
 {
@@ -262,7 +265,10 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered (&ready_list,&t->elem,less_prio_for_prio,0);           
   t->status = THREAD_READY;
+  
   intr_set_level (old_level);
+
+  
 }
 
 /* Returns the name of the running thread. */
@@ -600,7 +606,6 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
-
 }
 
 /* Returns a tid to use for a new thread. */
@@ -627,3 +632,4 @@ void update_ready_list(struct thread *t)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+

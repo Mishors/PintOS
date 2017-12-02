@@ -40,6 +40,7 @@ void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
+bool less_prio_prio(const struct list_elem *a,const struct list_elem *b,void *aux);
 
 /* Optimization barrier.
 
