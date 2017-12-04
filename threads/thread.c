@@ -195,7 +195,11 @@ void update_priority() //7atedrab interrupt
  intr_set_level (old_level); 
 }
 
-
+void update_ready_list(struct thread *t)
+{
+  list_remove(&t->elem);
+  list_insert_ordered (&ready_list,&t->elem,less_prio_for_prio,0);  
+}
 
 /* Prints thread statistics. */
 void
@@ -232,7 +236,8 @@ thread_create (const char *name, int priority,
   enum intr_level old_level;
 
   ASSERT (function != NULL);
-
+  list_init(&t->doners);
+  list_init(&t->lock_holders);
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
   if (t == NULL)
@@ -677,6 +682,9 @@ allocate_tid (void)
   return tid;
 }
 
+
+
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
@@ -769,5 +777,6 @@ real real_div_int (real x, int n)
    ret.real =  x.real/n;
    return ret;
 }
+
 
 

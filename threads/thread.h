@@ -96,6 +96,12 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    struct list_elem doner_elem;              /* List element. */
+    struct list_elem lock_elem;              /* List element. */
+    struct list doners;                 /* List of doners */
+    struct list lock_holders;                 /* List of doners */
+    int old_priority;
+    int is_donate;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -108,7 +114,7 @@ struct thread
     int nice;
     real recent_cpu;
   };
-
+void update_ready_list(struct thread *t);
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -174,4 +180,5 @@ real real_div_int (real x, int n);
 int check_prio_bound(int priority);
 
 #endif /* threads/thread.h */
+
 
