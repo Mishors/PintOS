@@ -14,7 +14,8 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
-
+ 
+int F =  16384;
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -28,6 +29,7 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+int enter_once;
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -52,13 +54,14 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
+#define TIME_FREQ 100
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
-
+real load_avg;
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -92,7 +95,8 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-
+  load_avg.real = 0 ;
+  enter_once = 0;
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -137,8 +141,46 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE){
      /* Calls thread_yield() implicitly */
+     if (t != idle_thread && thread_mlfqs) 
+     {
+      thread_current()->recent_cpu.real += 1;
+      update_priority();      
+     }
      intr_yield_on_return ();    
   }
+
+  if(timer_ticks() % TIME_FREQ == 0 && thread_mlfqs)
+  { 
+     int ready_threads = (int)list_size(&ready_list);
+     if(thread_current() != idle_thread)  //to be removed
+        ready_threads += 1;
+     load_avg = real_add(real_div_int(real_mult_int(load_avg, 59), 60), real_div_int(int_to_real(ready_threads), 60));
+     struct list_elem *e;
+     for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e))
+     {
+         struct thread *t1 = list_entry (e, struct thread, allelem);
+         real carrier = real_mult_int(load_avg,2);
+         t1->recent_cpu = real_add_int(real_mult(real_div(carrier,real_add_int(carrier,1)),t1->recent_cpu), t1->nice);
+     }
+  }
+}
+
+void update_priority() //7atedrab interrupt
+{
+ struct list_elem *e; 
+
+ enum intr_level old_level;
+
+  old_level = intr_disable ();  
+  	
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      t->priority = PRI_MAX -real_to_int(real_sub(real_div_int(t->recent_cpu , 4),int_to_real(t->nice * 2)));
+    }
+
+ intr_set_level (old_level); 
 }
 
 /*Comparator to push threads in ready list to preserve ascending order */
@@ -214,20 +256,26 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
-
+  if(thread_mlfqs)
+  {
+	  if (!enter_once)  
+	  {
+	      t->nice = 0;
+	      t->recent_cpu.real = 0;
+	      enter_once++;
+	  }
+	  else
+	  {
+	      t->nice = thread_current()->nice;
+	      t->recent_cpu =  thread_current()->recent_cpu;
+	  }
+  }
   intr_set_level (old_level);
-
+  
   /* Add to run queue. */
   thread_unblock (t);
-  /* added to preempt the cpu to allow the created
-     thread of higher priority to do its job */
-	
-  struct thread *cur = thread_current();
-  if (t->priority > cur->priority)
-     thread_yield();
   
-
- return tid;
+  return tid;
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -242,7 +290,7 @@ thread_block (void)
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF); 
   thread_current ()->status = THREAD_BLOCKED;  
-   schedule ();
+  schedule (); 
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -253,7 +301,6 @@ thread_block (void)
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
    update other data. */
-
 void
 thread_unblock (struct thread *t) 
 {
@@ -265,10 +312,9 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered (&ready_list,&t->elem,less_prio_for_prio,0);           
   t->status = THREAD_READY;
-  
+  if(thread_current() != idle_thread && thread_current()->priority < t->priority)
+     thread_yield(); 	
   intr_set_level (old_level);
-
-  
 }
 
 /* Returns the name of the running thread. */
@@ -343,23 +389,6 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 
-
-void
-thread_release (void) 
-{
-  struct thread *cur = thread_current ();
-  enum intr_level old_level;
-  
-  ASSERT (!intr_context ());
-
-  old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_insert_ordered (&ready_list,&cur->elem,less_prio_for_prio,0);         
-  cur->status = THREAD_READY;
-  
-  intr_set_level (old_level);
-}
-
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -394,33 +423,33 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
-  /* Not yet implemented. */
+  thread_current()->nice = nice;
+  real r1 = int_to_real(nice * 2);
+  int priority = PRI_MAX -real_to_int(real_sub(real_div_int(thread_current()->recent_cpu , 4),int_to_real(nice * 2)));
+  thread_set_priority(priority);
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return real_to_int_round(real_mult_int(load_avg,100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
-{
-  /* Not yet implemented. */
-  return 0;
+{  
+  return real_to_int_round(real_mult_int(thread_current()->recent_cpu,100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -606,6 +635,7 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
+
 }
 
 /* Returns a tid to use for a new thread. */
@@ -621,15 +651,93 @@ allocate_tid (void)
 
   return tid;
 }
-
-void update_ready_list(struct thread *t)
-{
-  list_remove(&t->elem);
-  list_insert_ordered (&ready_list,&t->elem,less_prio_for_prio,0);  
-}
-
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+real int_to_real (int n)
+{ 
+  real ret ;  
+  ret.real = n*F;
+  return ret;
+}
+
+int real_to_int(real x)
+{
+  return x.real/F;
+}
+
+int real_to_int_round(real x)
+{
+ if(x.real >= 0) 
+  {
+   return (x.real + F / 2) / F;  
+  }else{
+   return (x.real - F / 2) / F;
+  }
+}
+
+real real_add(real x,real y)
+{
+  real ret ; 
+  
+  ret.real = x.real + y.real;
+  return ret; 
+}
+
+real real_sub(real x,real y)
+{
+  real ret ; 
+  
+  ret.real = x.real - y.real;
+  return ret; 
+}
+
+real real_add_int(real x,int n)
+{
+  real ret ; 
+  
+  ret.real = x.real + n*F;
+  return ret; 
+}
+
+real real_sub_int(real x,int n)
+{
+  real ret ; 
+  
+  ret.real = x.real - n*F;
+  return ret; 
+}
+
+
+real real_mult (real x, real y)
+{
+   real ret;
+   ret.real = x.real * y.real;
+   ret.real /= F;
+   return ret;
+}
+
+real real_div (real x, real y)
+{
+   real ret;
+   ret.real =(x.real * F) / y.real;
+   return ret;
+}
+
+real real_mult_int (real x, int n)
+{
+   real ret;
+   ret.real = n * x.real;
+   return ret;
+}
+
+real real_div_int (real x, int n)
+{
+   real ret;
+   ret.real =  x.real/n;
+   return ret;
+}
+
 

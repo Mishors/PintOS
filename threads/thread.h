@@ -5,6 +5,11 @@
 #include <list.h>
 #include <stdint.h>
 
+typedef struct
+{
+  int real;                
+} real;
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -87,8 +92,6 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    int old_priority;                   /* old priority */
-    int is_donate;                         /* donation flag */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -102,6 +105,8 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
     int64_t wake_ticks;
+    int nice;
+    real recent_cpu;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -140,5 +145,31 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-void thread_release (void); 
+
+
+
+
+real int_to_real (int n);
+
+int real_to_int(real x);
+
+int real_to_int_round(real x);
+
+real real_add(real x,real y);
+
+real real_sub(real x,real y);
+
+real real_add_int(real x,int n);
+
+real real_sub_int(real x,int n);
+
+real real_mult (real x, real y);
+
+real real_div (real x, real y);
+
+real real_mult_int (real x, int n);
+
+real real_div_int (real x, int n);
+
 #endif /* threads/thread.h */
+
