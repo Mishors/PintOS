@@ -171,5 +171,7 @@ real real_mult_int (real x, int n);
 
 real real_div_int (real x, int n);
 
+int check_prio_bound(int priority);
+
 #endif /* threads/thread.h */
 

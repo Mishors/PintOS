@@ -501,6 +501,7 @@ list_max (struct list *list, list_less_func *less, void *aux)
         if (less (max, e, aux))
           max = e; 
     }
+  list_remove(max);
   return max;
 }
 

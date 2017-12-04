@@ -138,17 +138,6 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE){
-     /* Calls thread_yield() implicitly */
-     if (t != idle_thread && thread_mlfqs) 
-     {
-      thread_current()->recent_cpu.real += 1;
-      update_priority();      
-     }
-     intr_yield_on_return ();    
-  }
-
   if(timer_ticks() % TIME_FREQ == 0 && thread_mlfqs)
   { 
      int ready_threads = (int)list_size(&ready_list);
@@ -163,7 +152,27 @@ thread_tick (void)
          t1->recent_cpu = real_add_int(real_mult(real_div(carrier,real_add_int(carrier,1)),t1->recent_cpu), t1->nice);
      }
   }
+
+  /* Enforce preemption. */
+  if (++thread_ticks >= TIME_SLICE){
+     /* Calls thread_yield() implicitly */
+     if (t != idle_thread && thread_mlfqs) 
+     {
+      thread_current()->recent_cpu.real += 1;
+      update_priority();      
+     }
+     intr_yield_on_return ();    
+  }
 }
+
+/*Comparator to push threads in ready list to preserve ascending order */
+bool less_prio_for_prio(const struct list_elem *a,const struct list_elem *b,void *aux){
+struct thread *t1 = list_entry (a, struct thread, elem);
+struct thread *t2 = list_entry (b, struct thread, elem);
+ if(t1->priority <= t2->priority)
+  return true;
+ return false;
+}//end of less_comp function
 
 void update_priority() //7atedrab interrupt
 {
@@ -177,20 +186,16 @@ void update_priority() //7atedrab interrupt
        e = list_next (e))
     {
       struct thread *t = list_entry (e, struct thread, allelem);
-      t->priority = PRI_MAX -real_to_int(real_sub(real_div_int(t->recent_cpu , 4),int_to_real(t->nice * 2)));
+      int pr = PRI_MAX -real_to_int(real_sub(real_div_int(t->recent_cpu , 4),int_to_real(t->nice * 2)));
+      t->priority = check_prio_bound(pr);
     }
-
+  //list_sort (&ready_list, less_prio_for_prio , NULL);
+ // if(thread_current()->priority < list_entry (list_end(&ready_list), struct thread, elem)->priority)  BAYZAAAA
+ //  thread_yield();    howa by3mel yield fe al str ally ba3d al function
  intr_set_level (old_level); 
 }
 
-/*Comparator to push threads in ready list to preserve ascending order */
-bool less_prio_for_prio(const struct list_elem *a,const struct list_elem *b,void *aux){
-struct thread *t1 = list_entry (a, struct thread, elem);
-struct thread *t2 = list_entry (b, struct thread, elem);
- if(t1->priority <= t2->priority)
-  return true;
- return false;
-}//end of less_comp function
+
 
 /* Prints thread statistics. */
 void
@@ -259,16 +264,18 @@ thread_create (const char *name, int priority,
   if(thread_mlfqs)
   {
 	  if (!enter_once)  
-	  {
+	  {   msg("hello");
 	      t->nice = 0;
 	      t->recent_cpu.real = 0;
-	      enter_once++;
+	      enter_once = 1;
 	  }
 	  else
-	  {
+	  {   msg("hello 2");
 	      t->nice = thread_current()->nice;
-	      t->recent_cpu =  thread_current()->recent_cpu;
+	      t->recent_cpu =  thread_current()->recent_cpu;              
 	  }
+    int pr = PRI_MAX -real_to_int(real_sub(real_div_int(t->recent_cpu , 4),int_to_real(t->nice * 2)));
+    t->priority = check_prio_bound(pr);
   }
   intr_set_level (old_level);
   
@@ -310,7 +317,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered (&ready_list,&t->elem,less_prio_for_prio,0);           
+  list_insert_ordered (&ready_list,&t->elem,less_prio_for_prio,0);
+  //list_push_back(&ready_list,&t->elem);           
   t->status = THREAD_READY;
   if(thread_current() != idle_thread && thread_current()->priority < t->priority)
      thread_yield(); 	
@@ -382,8 +390,9 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_insert_ordered (&ready_list,&cur->elem,less_prio_for_prio,0);         
+   
+  if (cur != idle_thread)       
+   list_insert_ordered (&ready_list,&cur->elem,less_prio_for_prio,0); 
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -426,9 +435,19 @@ void
 thread_set_nice (int nice) 
 {
   thread_current()->nice = nice;
-  real r1 = int_to_real(nice * 2);
   int priority = PRI_MAX -real_to_int(real_sub(real_div_int(thread_current()->recent_cpu , 4),int_to_real(nice * 2)));
+  priority = check_prio_bound(priority);
   thread_set_priority(priority);
+}
+
+int check_prio_bound(int priority)
+{
+ if(priority>PRI_MAX)
+  return PRI_MAX;
+ if(priority<PRI_MIN)
+ return PRI_MIN;
+ return priority; 
+
 }
 
 /* Returns the current thread's nice value. */
@@ -442,14 +461,14 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  return real_to_int_round(real_mult_int(load_avg,100));
+  return real_to_int(real_mult_int(load_avg,100)); 
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {  
-  return real_to_int_round(real_mult_int(thread_current()->recent_cpu,100));
+  return real_to_int(real_mult_int(thread_current()->recent_cpu,100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -565,7 +584,13 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
+  {
+    if(thread_mlfqs)
+    
+    return list_entry (list_max(&ready_list, less_prio_for_prio, NULL),struct thread, elem);
+    
     return list_entry (list_pop_back (&ready_list), struct thread, elem);
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -664,8 +689,13 @@ real int_to_real (int n)
 }
 
 int real_to_int(real x)
+{ int sign = 1;
+  if (x.real < 0) 
 {
-  return x.real/F;
+   x.real *= -1;
+   sign = -1;
+}
+  return (x.real/F) * sign;
 }
 
 int real_to_int_round(real x)
@@ -680,7 +710,7 @@ int real_to_int_round(real x)
 
 real real_add(real x,real y)
 {
-  real ret ; 
+  real ret ;
   
   ret.real = x.real + y.real;
   return ret; 

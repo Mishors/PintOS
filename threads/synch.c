@@ -261,7 +261,17 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
+    int priority;               /*priority of the semaphore*/
   };
+
+bool less_prio_sema(const struct list_elem *a,const struct list_elem *b,void *aux){
+struct semaphore_elem *t1 = list_entry (a, struct semaphore_elem, elem);
+struct semaphore_elem *t2 = list_entry (b, struct semaphore_elem, elem);
+ if(t1->priority <= t2->priority)
+  return true;
+ return false;
+}//end of less_comp function
+
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
@@ -303,9 +313,10 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
-  
+  waiter.priority = thread_current()->priority;
   sema_init (&waiter.semaphore, 0);
-  list_push_back (&cond->waiters, &waiter.elem);
+  //list_push_back (&cond->waiters, &waiter.elem);
+  list_insert_ordered(&cond->waiters, &waiter.elem,less_prio_sema,0);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
@@ -327,7 +338,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
+    sema_up (&list_entry (list_pop_back	 (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);
 }
 
