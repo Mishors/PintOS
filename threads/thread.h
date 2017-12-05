@@ -5,10 +5,10 @@
 #include <list.h>
 #include <stdint.h>
 
-typedef struct
+struct real
 {
-  int real;                
-} real;
+  int value;                
+};
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -112,7 +112,7 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
     int64_t wake_ticks;
     int nice;
-    real recent_cpu;
+    struct real *recent_cpu;
   };
 void update_ready_list(struct thread *t);
 /* If false (default), use round-robin scheduler.
@@ -155,27 +155,27 @@ int thread_get_load_avg (void);
 
 
 
-real int_to_real (int n);
+int int_to_real (int n);
 
-int real_to_int(real x);
+int real_to_int(struct real *x);
 
-int real_to_int_round(real x);
+int real_to_int_round(struct real *x);
 
-real real_add(real x,real y);
+int real_add(struct real *x,struct real *y);
 
-real real_sub(real x,real y);
+int real_sub(struct real *x,struct real *y);
 
-real real_add_int(real x,int n);
+int real_add_int(struct real *x,int n);
 
-real real_sub_int(real x,int n);
+int real_sub_int(struct real *x,int n);
 
-real real_mult (real x, real y);
+int real_mult (struct real *x, struct real *y);
 
-real real_div (real x, real y);
+int real_div (struct real *x, struct real *y);
 
-real real_mult_int (real x, int n);
+int real_mult_int (struct real *x, int n);
 
-real real_div_int (real x, int n);
+int real_div_int (struct real *x, int n);
 
 int check_prio_bound(int priority);
 
