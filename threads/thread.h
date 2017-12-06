@@ -5,10 +5,10 @@
 #include <list.h>
 #include <stdint.h>
 
-struct real
+typedef struct
 {
-  int value;                
-};
+  int real;                
+} real;
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -92,16 +92,13 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int old_priority;                   /* Priority to be handled during donation */
+    int donation;                       /* set to 1 when there is a donation */
     struct list_elem allelem;           /* List element for all threads list. */
+    struct lock *lock;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    struct list_elem doner_elem;              /* List element. */
-    struct list_elem lock_elem;              /* List element. */
-    struct list doners;                 /* List of doners */
-    struct list lock_holders;                 /* List of doners */
-    int old_priority;
-    int is_donate;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -112,9 +109,9 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
     int64_t wake_ticks;
     int nice;
-    struct real *recent_cpu;
+    real recent_cpu;
   };
-void update_ready_list(struct thread *t);
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -155,27 +152,27 @@ int thread_get_load_avg (void);
 
 
 
-int int_to_real (int n);
+real int_to_real (int n);
 
-int real_to_int(struct real *x);
+int real_to_int(real x);
 
-int real_to_int_round(struct real *x);
+int real_to_int_round(real x);
 
-int real_add(struct real *x,struct real *y);
+real real_add(real x,real y);
 
-int real_sub(struct real *x,struct real *y);
+real real_sub(real x,real y);
 
-int real_add_int(struct real *x,int n);
+real real_add_int(real x,int n);
 
-int real_sub_int(struct real *x,int n);
+real real_sub_int(real x,int n);
 
-int real_mult (struct real *x, struct real *y);
+real real_mult (real x, real y);
 
-int real_div (struct real *x, struct real *y);
+real real_div (real x, real y);
 
-int real_mult_int (struct real *x, int n);
+real real_mult_int (real x, int n);
 
-int real_div_int (struct real *x, int n);
+real real_div_int (real x, int n);
 
 int check_prio_bound(int priority);
 

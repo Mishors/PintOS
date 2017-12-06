@@ -205,25 +205,29 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
-  if(lock->holder != NULL && lock->holder->priority <= thread_current()->priority)
-  {list_init(&thread_current()->doners);
-   list_init(&thread_current()->lock_holders);
-   list_push_back(&lock->holder->doners,&thread_current()->doner_elem);
-   list_push_back(&thread_current()->lock_holders,&lock->holder->lock_elem);
-   struct thread *to_be_donated = &lock->holder;
-   struct list *l = &to_be_donated->lock_holders;
-   struct list_elem *le;   
-   while (!list_empty(&l))
-   {
-    le = list_front(&l);
-    to_be_donated = list_entry(le,struct thread,lock_elem);     
-    l = &to_be_donated->lock_holders;
-   }    
-    to_be_donated->old_priority = to_be_donated->priority;
-    to_be_donated->priority = thread_current()->priority;
-    update_ready_list(&to_be_donated);
-    to_be_donated->is_donate = 1;
-  }
+  if(lock->holder != NULL && thread_current()->priority > lock->holder->priority)
+   { //donation
+     thread_current()->lock = &lock;
+     struct thread *old_holder = lock->holder;
+     old_holder->donation = 1;
+     old_holder->old_priority = old_holder->priority;
+     old_holder->priority = thread_current()->priority;
+     /*struct lock *l = &old_holder->lock;
+     //check nested donations
+     while (true)
+     {
+       if(l == NULL) break;
+       struct thread *new_holder = &l->holder;
+       if(new_holder != NULL && old_holder->priority < new_holder->priority)
+       { //donation             
+	     new_holder->old_priority = new_holder->priority;
+	     new_holder->priority = old_holder->priority;
+	     l = &new_holder->lock;
+       }else {break;}
+     }*/
+   
+   }
+  
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 }
@@ -258,15 +262,12 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-  if (thread_current()->is_donate == 1)
-  {
-    thread_current()->is_donate = 0;
-    struct list_elem *doner = list_begin(&thread_current()->doners);
-    struct thread *doner_thread = list_entry (doner, struct thread, doner_elem);
-    doner_thread->old_priority = doner_thread->priority;
-    doner_thread->priority = thread_current()->priority;
-    thread_current()->priority = thread_current()->old_priority;
-  }
+  if(thread_current()->donation == 1)
+   {
+     thread_current()->donation = 0;
+     thread_current()->priority = thread_current()->old_priority;
+     thread_current()->lock = NULL;
+   }
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
@@ -383,3 +384,4 @@ cond_broadcast (struct condition *cond, struct lock *lock)
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
 }
+
