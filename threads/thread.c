@@ -425,6 +425,7 @@ thread_set_priority (int new_priority)
      if(new_priority > thread_current ()->priority)
       {
         thread_current ()->priority = new_priority;
+        msg("opa");
       }
    }
    else
