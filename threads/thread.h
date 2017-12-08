@@ -95,7 +95,8 @@ struct thread
     int old_priority;                   /* Priority to be handled during donation */
     int donation;                       /* set to 1 when there is a donation */
     struct list_elem allelem;           /* List element for all threads list. */
-    struct lock *lock;
+    struct lock *wait_lock;
+    struct list locks;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -177,5 +178,6 @@ real real_div_int (real x, int n);
 int check_prio_bound(int priority);
 
 #endif /* threads/thread.h */
+
 
 

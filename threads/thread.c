@@ -418,18 +418,27 @@ thread_foreach (thread_action_func *func, void *aux)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
-{ 
+{   
   /* No donation */
-  if(thread_current ()->donation == 1)
+  if(thread_current ()->priority != thread_current()->old_priority)
    {
-    thread_current ()->old_priority = new_priority;
+     if(new_priority > thread_current ()->priority)
+      {
+        thread_current ()->priority = new_priority;
+      }
    }
    else
-   {
-    thread_current ()->old_priority = new_priority;
+   {    
     thread_current ()->priority = new_priority;
    }
-  thread_yield();
+   
+   thread_current ()->old_priority = new_priority;
+
+  if(list_size(&ready_list) != 0)
+   {
+     if(list_entry(list_max_donate(&ready_list,less_prio_for_prio,0),struct thread,elem)->priority > thread_current ()->priority)
+     	thread_yield();
+   }
 }
 
 /* Returns the current thread's priority. */
@@ -563,7 +572,9 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->old_priority = priority;
   t->magic = THREAD_MAGIC;
+  list_init(&t->locks);
   list_insert_ordered (&all_list,&t->allelem,less_prio_for_prio,0);         
   //list_push_back (&all_list, &t->allelem);
   
@@ -778,6 +789,7 @@ real real_div_int (real x, int n)
    ret.real =  x.real/n;
    return ret;
 }
+
 
 
 

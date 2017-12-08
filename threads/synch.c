@@ -206,30 +206,16 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
   if(lock->holder != NULL && thread_current()->priority > lock->holder->priority)
-   { //donation
-     thread_current()->lock = &lock;
-     struct thread *old_holder = lock->holder;
-     old_holder->donation = 1;
-     old_holder->old_priority = old_holder->priority;
-     old_holder->priority = thread_current()->priority;
-     /*struct lock *l = &old_holder->lock;
-     //check nested donations
-     while (true)
-     {
-       if(l == NULL) break;
-       struct thread *new_holder = &l->holder;
-       if(new_holder != NULL && old_holder->priority < new_holder->priority)
-       { //donation             
-	     new_holder->old_priority = new_holder->priority;
-	     new_holder->priority = old_holder->priority;
-	     l = &new_holder->lock;
-       }else {break;}
-     }*/
-   
-   }
+   { //donation         
+     lock->holder->priority = thread_current()->priority;    
+     lock->priority = thread_current()->priority;
+     thread_current()->wait_lock = lock;  
+  }
   
   sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+  thread_current()->wait_lock = NULL;
+  list_push_back (&thread_current()->locks, &lock->lock_elem); 
+  lock->holder = thread_current ();  
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -252,6 +238,13 @@ lock_try_acquire (struct lock *lock)
   return success;
 }
 
+bool less_donate(const struct list_elem *a,const struct list_elem *b,void *aux){
+struct lock *t1 = list_entry (a, struct lock, lock_elem);
+struct lock *t2 = list_entry (b, struct lock, lock_elem);
+ if(t1->priority <= t2->priority)
+  return true;
+ return false;
+}//end of less_comp function
 /* Releases LOCK, which must be owned by the current thread.
 
    An interrupt handler cannot acquire a lock, so it does not
@@ -262,12 +255,18 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-  if(thread_current()->donation == 1)
-   {
-     thread_current()->donation = 0;
-     thread_current()->priority = thread_current()->old_priority;
-     thread_current()->lock = NULL;
-   }
+  list_remove(&lock->lock_elem);
+  thread_current()->priority = thread_current()->old_priority;
+  lock->priority = -1;
+  //thread_current()->lock = NULL;
+  if(list_size(&thread_current()->locks) > 0)
+  {   
+	    int pr = list_entry(list_max_donate(&thread_current()->locks,less_donate,0),struct lock, lock_elem)->priority;
+	    if(pr>thread_current()->priority)
+	      {
+		thread_current()->priority = pr;
+	      }
+  }
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
@@ -384,4 +383,5 @@ cond_broadcast (struct condition *cond, struct lock *lock)
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
 }
+
 

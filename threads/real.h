@@ -1,32 +1,18 @@
 #ifndef THREADS_REAL_H
 #define THREADS_REAL_H
 
-typedef struct
-  {
-    int real;
-                 
-  }real;
+#define F 16384
 
-real int_to_real (int n);
-
-int real_to_int(real x);
-
-int real_to_int_round(real x);
-
-real real_add(real x,real y);
-
-real real_sub(real x,real y);
-
-real add_real_int(real x,int n);
-
-real sub_real_int(real x,int n);
-
-real mult_real (real x, real y);
-
-real div_real (real x, real y);
-
-real mult_int_real (real x, int n);
-
-real div_int_real (real x, int n);
+#define INT_TO_REAL(n) (n) * (F)
+#define REAL_TO_INT(x) (x) / (F)
+#define REAL_TO_INT_ROUND(x) ((x) >= 0 ? ((x) + (F) / 2) / (F) : ((x) - (F) / 2) / (F))
+#define REAL_ADD(x ,y) (x) + (y)
+#define REAL_SUB(x ,y) (x) - (y)
+#define REAL_ADD_INT(x , n) (x) + (n) * (F)
+#define REAL_SUB_INT(x , n) (x) - (n) * (F)
+#define REAL_MULT(x , y) ((int64_t)(x)) * (y) / (F)
+#define REAL_DIV(x , y) ((int64_t)(x)) * (F) / (y)
+#define REAL_MULT_INT(x , n) (x) * (n)
+#define REAL_DIV_INT(x , n) (x) / (n)
 
 #endif
