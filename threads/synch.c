@@ -59,6 +59,7 @@ struct thread *t2 = list_entry (b, struct thread, elem);
  return false;
 }//end of less_comp function
 
+
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
    to become positive and then atomically decrements it.
 
@@ -77,12 +78,12 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      //list_push_back (&sema->waiters, &thread_current ()->elem);
-      list_insert_ordered (&sema->waiters,&thread_current ()->elem,less_prio_prio,0);           
+      list_push_back (&sema->waiters, &thread_current ()->elem);
+      //list_insert_ordered (&sema->waiters,&thread_current ()->elem,less_prio_prio,0);           
       thread_block ();
     }
-  sema->value--;
-  intr_set_level (old_level);
+  sema->value--;  
+  intr_set_level (old_level); 
 }
 
 /* Down or "P" operation on a semaphore, but only if the
@@ -124,10 +125,9 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   sema->value++;
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_back (&sema->waiters),
-                                struct thread, elem));
-  intr_set_level (old_level);
+  if (!list_empty (&sema->waiters))     
+      thread_unblock(list_entry(list_max(&sema->waiters,less_prio_prio,0),struct thread,elem));
+   intr_set_level (old_level);
 }
 
 static void sema_test_helper (void *sema_);
@@ -293,6 +293,7 @@ struct semaphore_elem
     int priority;               /*priority of the semaphore*/
   };
 
+
 bool less_prio_sema(const struct list_elem *a,const struct list_elem *b,void *aux){
 struct semaphore_elem *t1 = list_entry (a, struct semaphore_elem, elem);
 struct semaphore_elem *t2 = list_entry (b, struct semaphore_elem, elem);
@@ -300,7 +301,6 @@ struct semaphore_elem *t2 = list_entry (b, struct semaphore_elem, elem);
   return true;
  return false;
 }//end of less_comp function
-
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
