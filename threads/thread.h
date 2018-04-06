@@ -5,11 +5,6 @@
 #include <list.h>
 #include <stdint.h>
 
-typedef struct
-{
-  int real;                
-} real;
-
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -110,9 +105,8 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
     int64_t wake_ticks;
     int nice;
-    real recent_cpu;
+    int recent_cpu;
   };
-
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -149,35 +143,8 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-
-
-
-
-real int_to_real (int n);
-
-int real_to_int(real x);
-
-int real_to_int_round(real x);
-
-real real_add(real x,real y);
-
-real real_sub(real x,real y);
-
-real real_add_int(real x,int n);
-
-real real_sub_int(real x,int n);
-
-real real_mult (real x, real y);
-
-real real_div (real x, real y);
-
-real real_mult_int (real x, int n);
-
-real real_div_int (real x, int n);
-
 int check_prio_bound(int priority);
 
 #endif /* threads/thread.h */
-
 
 

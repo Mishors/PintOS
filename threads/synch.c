@@ -211,9 +211,7 @@ lock_acquire (struct lock *lock)
    { //donation         
      curr_lock->holder->priority = thread_current()->priority;    
      curr_lock->priority = thread_current()->priority; 
-     curr_lock = curr_lock->holder->wait_lock;
-    // if(curr_lock == NULL)  
-    // msg("hey");  
+     curr_lock = curr_lock->holder->wait_lock;    
    }  
   sema_down (&lock->semaphore);
   thread_current()->wait_lock = NULL;
