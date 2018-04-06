@@ -25,6 +25,7 @@ Multilevel feedback queue scheduler which is similar to the BSD scheduler to red
 Like the priority scheduler, the advanced scheduler chooses the thread to run based on priorities. However, the advanced scheduler does not do priority donation.
 
 Advanced Scheduler uses equations to calculate some values that make it take the decisions for example :
-* [](https://latex.codecogs.com/gif.latex?Priority%20%3D%20PRI%5C_MAX%20-%20%28%5Cfrac%7Brecent_cpu%20%7D%7B4%7D%29%20-%20%28nice%20*%202%29%2C) 
+* ![](https://latex.codecogs.com/gif.latex?priority%20%3D%20PRI%5C_MAX%20-%20%28%5Cfrac%7Brecent%5C_cpu%7D%7B4%7D%29%20-%20%28nice%20*%202%29) 
+* ![](https://latex.codecogs.com/gif.latex?recent%5C_cpu%20%3D%20%5Cfrac%7B2*load%5C_avg%7D%7B2*load%5C_avg%20&plus;%201%7D%20*%20recent%5C_cpu%20&plus;%20nice)
 
 
